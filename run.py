@@ -77,14 +77,11 @@ def main():
     print('Summary')
     print('=' * 60)
     for (name, version) in sorted(test_results):
-        result = test_results[(name, version)]
-        if result == 0:
-            status = 'OK'
-        else:
-            status = 'Failed'
-        package = '%s-%s' % (name, version)
-        spaces = (50 - len(package)) * ' '
-        print('%s%s%s' % (package, spaces, status))
+        print(name)
+        result = os.system('devpi list %s' % name)
+        if result != 0:
+            print('devpi list failed :(')
+        print('-'*60)
 
 
 #===================================================================================================
