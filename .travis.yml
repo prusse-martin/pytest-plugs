@@ -5,7 +5,7 @@ python:
 install:
   - pip uninstall -y pytest
   - pip install --use-mirrors pytest==$PYTEST_VERSION
-  - pip install --pre -i https://devpi.net/hpk/dev/+simple/ -U devpi
+  - pip install -i https://devpi.net/hpk/dev/+simple/ -U devpi
   - pip install --use-mirrors simplejson
 env:
   - PYTEST_VERSION=2.4.2
