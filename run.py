@@ -9,20 +9,6 @@ from zipfile import ZipFile
 #===================================================================================================
 # py2x3 compatibility
 #===================================================================================================
-# tox.ini contents when downloaded package does not have a tox.ini file
-# in this case we only display help information
-PLACEHOLDER_TOX = '''\
-[tox]
-
-[testenv]
-deps=pytest
-commands=
-    py.test --help
-'''
-
-#===================================================================================================
-# py2x3 compatibility
-#===================================================================================================
 
 if sys.version_info[0] == 3:
     from xmlrpc.client import ServerProxy
@@ -53,12 +39,7 @@ def run_devpi(name):
     tox_env = 'py%d%d' % sys.version_info[:2]
 
     fallback_tox = 'fallback-tox.ini'
-    if not os.path.isfile(fallback_tox):
-        f = open(fallback_tox, 'w')
-        try:
-            f.write(PLACEHOLDER_TOX)
-        finally:
-            f.close()
+    assert os.path.isfile(fallback_tox)
 
     result = os.system('devpi test --fallback-ini=%s %s --tox-args="-e %s"' % (fallback_tox, name, tox_env))
     return result
@@ -76,7 +57,7 @@ def main():
         ('pytest-pep8', '1.0.5'),
     #    ('pytest-cache', '1.0'),
     #    ('pytest-xdist', '1.9'),
-    #    ('pytest-bugzilla', '0.2'),
+        ('pytest-bugzilla', '0.2'),
     ]
 
     result = os.system('devpi quickstart')
