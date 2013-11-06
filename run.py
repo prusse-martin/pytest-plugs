@@ -9,7 +9,20 @@ from zipfile import ZipFile
 #===================================================================================================
 # py2x3 compatibility
 #===================================================================================================
-import itertools
+# tox.ini contents when downloaded package does not have a tox.ini file
+# in this case we only display help information
+PLACEHOLDER_TOX = '''\
+[tox]
+
+[testenv]
+deps=pytest
+commands=
+    py.test --help
+'''
+
+#===================================================================================================
+# py2x3 compatibility
+#===================================================================================================
 
 if sys.version_info[0] == 3:
     from xmlrpc.client import ServerProxy
@@ -25,105 +38,30 @@ else:
 def iter_plugins(client, search='pytest-'):
     '''
     Returns an iterator of (name, version) from PyPI.
-    
+
     :param client: xmlrpclib.ServerProxy
-    :param search: package names to search for 
+    :param search: package names to search for
     '''
     for plug_data in client.search({'name': search}):
         yield plug_data['name'], plug_data['version']
 
 
 #===================================================================================================
-# get_latest_versions
+# run_devpi
 #===================================================================================================
-def get_latest_versions(plugins):
-    '''
-    Returns an iterator of (name, version) from the given list of (name, version), but returning
-    only the latest version of the package. Uses distutils.LooseVersion to ensure compatibility
-    with PEP386.
-    '''
-    plugins = [(name, LooseVersion(version)) for (name, version) in plugins]
-    for name, grouped_plugins in itertools.groupby(plugins, key=lambda x: x[0]):
-        name, loose_version = list(grouped_plugins)[-1]
-        yield name, str(loose_version)
-
-
-#===================================================================================================
-# download_package
-#===================================================================================================
-def download_package(client, name, version):
-    found_dists = []
-    for url_data in client.release_urls(name, version):
-        basename = os.path.basename(url_data['url'])
-        found_dists.append(url_data['packagetype'])
-        if url_data['packagetype'] == 'sdist':
-            urlretrieve(url_data['url'], basename)
-            return basename
-
-    return None
-
-
-#===================================================================================================
-# extract
-#===================================================================================================
-def extract(basename):
-    """
-    Extracts the contents of the given archive into the current directory.
-
-    :param basename: name of the archive related to the current directory
-    :type basename: str
-
-    :rtype: str
-    :return: the name of the directory where the contents where extracted
-    """
-    from contextlib import closing
-
-    extractors = {
-        '.zip': ZipFile,
-        '.tar.gz': tarfile.open,
-        '.tgz': tarfile.open,
-    }
-    for ext, extractor in extractors.items():
-        if basename.endswith(ext):
-            with closing(extractor(basename)) as f: # need closing for python 2.6 because of TarFile
-                f.extractall('.')
-            return basename[:-len(ext)]
-    assert False, 'could not extract %s' % basename
-
-
-#===================================================================================================
-# run_tox
-#===================================================================================================
-def run_tox(directory):
+def run_devpi(name):
     tox_env = 'py%d%d' % sys.version_info[:2]
 
-    tox_file = os.path.join(directory, 'tox.ini')
-    if not os.path.isfile(tox_file):
-        f = open(tox_file, 'w')
+    fallback_tox = 'fallback-tox.ini'
+    if not os.path.isfile(fallback_tox):
+        f = open(fallback_tox, 'w')
         try:
             f.write(PLACEHOLDER_TOX)
         finally:
             f.close()
 
-    oldcwd = os.getcwd()
-    try:
-        os.chdir(directory)
-        result = os.system('tox --result-json=result.json -e %s' % tox_env)
-        return result
-    finally:
-        os.chdir(oldcwd)
-
-
-# tox.ini contents when downloaded package does not have a tox.ini file
-# in this case we only display help information
-PLACEHOLDER_TOX = '''\
-[tox]
-
-[testenv]
-deps=pytest
-commands=
-    py.test --help
-'''
+    result = os.system('devpi test --fallback-ini=%s %s --tox-args="-e %s"' % (fallback_tox, name, tox_env))
+    return result
 
 
 #===================================================================================================
@@ -133,7 +71,7 @@ def main():
     client = ServerProxy('https://pypi.python.org/pypi')
 
     plugins = iter_plugins(client)
-    plugins = list(get_latest_versions(plugins))
+    #plugins = list(get_latest_versions(plugins))
     plugins = [
         ('pytest-pep8', '1.0.5'),
     #    ('pytest-cache', '1.0'),
@@ -141,19 +79,15 @@ def main():
     #    ('pytest-bugzilla', '0.2'),
     ]
 
+    result = os.system('devpi quickstart')
+    if not result:
+        sys.exit('failed to start devpi server')
+
     test_results = {}
     for name, version in plugins:
         print('=' * 60)
         print('%s-%s' % (name, version))
-        basename = download_package(client, name, version)
-        if basename is None:
-            print('-> No sdist found (skipping)')
-            continue
-        print('-> downloaded', basename)
-        directory = extract(basename)
-        print('-> extracted to', directory)
-        result = run_tox(directory)
-        print('-> tox returned %s' % result)
+        result = run_devpi(name)
         test_results[(name, version)] = result
 
 
