@@ -80,7 +80,7 @@ def main():
     ]
 
     result = os.system('devpi quickstart')
-    if not result:
+    if result != 0:
         sys.exit('failed to start devpi server')
 
     test_results = {}
