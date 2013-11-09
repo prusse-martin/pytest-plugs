@@ -139,6 +139,8 @@ def prepare_tox_file(directory, pytest_ver):
         with open(tox_file, 'w') as f:
             f.write(contents)
 
+    return tox_file
+
 #===================================================================================================
 # main
 #===================================================================================================
@@ -149,12 +151,12 @@ def main():
 
     plugins = iter_plugins(client)
     plugins = list(get_latest_versions(plugins))
-    plugins = [
-        ('pytest-pep8', '1.0.5'),
+    #plugins = [
+    #    ('pytest-pep8', '1.0.5'),
     #    ('pytest-cache', '1.0'),
     #    ('pytest-xdist', '1.9'),
     #    ('pytest-bugzilla', '0.2'),
-    ]
+    #]
 
     test_results = {}
     for name, version in plugins:
@@ -169,9 +171,12 @@ def main():
         print('-> extracted to', directory)
 
         pytest_ver = os.environ.get('PYTEST_VERSION', None)
-        prepare_tox_file(directory, pytest_ver)
+        tox_file = prepare_tox_file(directory, pytest_ver)
         if pytest_ver:
             print('-> forcing pytest-%s' % pytest_ver)
+            with open(tox_file) as f:
+                for line in f.readlines():
+                    print('  %s' % line.strip())
         result = run_tox(directory, tox_env)
         print('-> tox returned %s' % result)
         test_results[(name, version)] = result
