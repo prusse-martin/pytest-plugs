@@ -2,6 +2,7 @@ from __future__ import print_function, with_statement, division
 from distutils.version import LooseVersion
 
 import os
+import re
 import sys
 import tarfile
 from zipfile import ZipFile
@@ -82,6 +83,7 @@ def extract(basename):
     """
     from contextlib import closing
 
+
     extractors = {
         '.zip': ZipFile,
         '.tar.gz': tarfile.open,
@@ -99,14 +101,6 @@ def extract(basename):
 # run_tox
 #===================================================================================================
 def run_tox(directory, tox_env):
-    tox_file = os.path.join(directory, 'tox.ini')
-    if not os.path.isfile(tox_file):
-        f = open(tox_file, 'w')
-        try:
-            f.write(PLACEHOLDER_TOX)
-        finally:
-            f.close()
-
     oldcwd = os.getcwd()
     try:
         os.chdir(directory)
@@ -127,6 +121,23 @@ commands=
     py.test --help
 '''
 
+#===================================================================================================
+# prepare_tox_file
+#===================================================================================================
+def prepare_tox_file(directory, pytest_ver):
+    tox_file = os.path.join(directory, 'tox.ini')
+    if not os.path.isfile(tox_file):
+        with open(tox_file, 'w') as f:
+            f.write(PLACEHOLDER_TOX)
+
+    if pytest_ver:
+        with open(tox_file) as f:
+            contents = f.read()
+
+        contents = re.sub(r'pytest([\s,])', r'pytest==%s\1' % pytest_ver, contents)
+
+        with open(tox_file, 'w') as f:
+            f.write(contents)
 
 #===================================================================================================
 # main
@@ -138,12 +149,12 @@ def main():
 
     plugins = iter_plugins(client)
     plugins = list(get_latest_versions(plugins))
-    #plugins = [
-    #    ('pytest-pep8', '1.0.5'),
+    plugins = [
+        ('pytest-pep8', '1.0.5'),
     #    ('pytest-cache', '1.0'),
     #    ('pytest-xdist', '1.9'),
     #    ('pytest-bugzilla', '0.2'),
-    #]
+    ]
 
     test_results = {}
     for name, version in plugins:
@@ -156,10 +167,14 @@ def main():
         print('-> downloaded', basename)
         directory = extract(basename)
         print('-> extracted to', directory)
+
+        pytest_ver = os.environ.get('PYTEST_VERSION', None)
+        prepare_tox_file(directory, pytest_ver)
+        if pytest_ver:
+            print('-> forcing pytest-%s' % pytest_ver)
         result = run_tox(directory, tox_env)
         print('-> tox returned %s' % result)
         test_results[(name, version)] = result
-
 
     print('\n\n')
     print('=' * 60)
@@ -178,10 +193,10 @@ def main():
         post_data.append(
             {'name': name,
              'version': version,
-             'env' : tox_env,
+             'env': tox_env,
              'pytest': pytest_version,
              'status': status,
-             }
+            }
         )
     post_url = os.environ.get('PLUGS_SITE')
     if post_url:
